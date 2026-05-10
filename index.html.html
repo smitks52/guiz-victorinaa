@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Викторина</title>
+    <style>
+        /* ========== НОВЫЕ СТИЛИ (фон, карточки, кнопки) из второго кода ========== */
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .question {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 32px;
+            margin-bottom: 20px;
+            box-shadow: 0 25px 45px rgba(0,0,0,0.2);
+        }
+        .option {
+            display: block;
+            margin: 10px 0;
+            padding: 14px 20px;
+            background: #f7fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 60px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .option:hover {
+            background: #edf2f7;
+            border-color: #cbd5e0;
+            transform: scale(1.01);
+        }
+        .option.selected {
+            background: #667eea;
+            border-color: #667eea;
+            color: white;
+        }
+        button {
+            background: #48bb78;
+            color: white;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 40px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            font-weight: bold;
+            width: 100%;
+        }
+        button:disabled {
+            background: #a0aec0;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        .result {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 32px;
+            text-align: center;
+            box-shadow: 0 25px 45px rgba(0,0,0,0.2);
+        }
+        .hidden {
+            display: none;
+        }
+        .best {
+            text-align: right;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #4a5568;
+        }
+        /* ========== КОНЕЦ НОВЫХ СТИЛЕЙ ========== */
+    </style>
+</head>
+<body>
+
+<div id="quizArea">
+    <div class="best" id="bestDisplay">🏆 Лучший: --</div>
+    <div class="question" id="questionBlock">
+        <h3 id="questionText">Загрузка...</h3>
+        <div id="optionsBlock"></div>
+    </div>
+    <button id="nextBtn" disabled>Далее →</button>
+</div>
+
+<div id="resultArea" class="result hidden">
+    <h2>Результат</h2>
+    <p id="scoreText">Вы набрали 0 из 0</p>
+    <p id="messageText"></p>
+    <button id="restartBtn">Пройти снова</button>
+</div>
+
+<script>
+    // ==================== ВОПРОСЫ ====================
+    const questions = [
+        { text: "Что означает аббревиатура HTML?", options: ["Hyper Text Markup Language", "Home Tool Markup Language", "Hyperlinks and Text Markup Language", "High-Level Text Management Language"], correct: 0 },
+        { text: "Какой тег используется для создания ссылки?", options: ["<a>", "<link>", "<href>", "<url>"], correct: 0 },
+        { text: "Какое CSS-свойство изменяет цвет текста?", options: ["text-color", "color", "font-color", "background-color"], correct: 1 },
+        { text: "Как объявить переменную в JavaScript с блочной областью видимости?", options: ["var", "let", "const", "let и const"], correct: 3 },
+        { text: "Какой метод массива добавляет элемент в конец?", options: ["push()", "pop()", "unshift()", "append()"], correct: 0 },
+        { text: "Что выведет console.log(typeof null)?", options: ["null", "undefined", "object", "number"], correct: 2 },
+        { text: "Какой селектор выбирает элемент с id='header'?", options: [".header", "#header", "header", "*header"], correct: 1 },
+        { text: "Какое свойство делает контейнер гибким (Flexbox)?", options: ["display: flex", "display: block", "flex-container", "position: flex"], correct: 0 },
+        { text: "Какой тег используется для подключения JavaScript в HTML?", options: ["<js>", "<javascript>", "<script>", "<code>"], correct: 2 },
+        { text: "Что такое семантическая вёрстка?", options: ["Использование тегов, описывающих содержание (header, article)", "Код, который быстрее загружается", "Вёрстка без CSS", "Использование только div и span"], correct: 0 }
+    ];
+
+    let current = 0;
+    let answers = new Array(questions.length).fill(null);
+    let finished = false;
+    let best = localStorage.getItem("bestScore");
+    if (best) best = parseInt(best); else best = null;
+
+    const quizDiv = document.getElementById("quizArea");
+    const resultDiv = document.getElementById("resultArea");
+    const questionText = document.getElementById("questionText");
+    const optionsDiv = document.getElementById("optionsBlock");
+    const nextBtn = document.getElementById("nextBtn");
+    const bestDisplay = document.getElementById("bestDisplay");
+    const scoreSpan = document.getElementById("scoreText");
+    const messageSpan = document.getElementById("messageText");
+    const restartBtn = document.getElementById("restartBtn");
+
+    function updateBestUI() {
+        bestDisplay.innerText = best ? `🏆 Лучший: ${best}/${questions.length}` : "🏆 Лучший: --";
+    }
+
+    function saveBest(score) {
+        if (best === null || score > best) {
+            best = score;
+            localStorage.setItem("bestScore", best);
+            updateBestUI();
+        }
+    }
+
+    function render() {
+        if (finished) return;
+        let q = questions[current];
+        questionText.innerText = q.text;
+        optionsDiv.innerHTML = "";
+        q.options.forEach((opt, idx) => {
+            let btn = document.createElement("div");
+            btn.className = "option";
+            if (answers[current] === idx) btn.classList.add("selected");
+            btn.innerText = String.fromCharCode(65+idx) + ". " + opt;
+            if (answers[current] === null) {
+                btn.onclick = () => select(idx);
+            }
+            optionsDiv.appendChild(btn);
+        });
+        nextBtn.disabled = (answers[current] === null);
+    }
+
+    function select(idx) {
+        if (finished) return;
+        if (answers[current] !== null) return;
+        answers[current] = idx;
+        render();
+    }
+
+    function next() {
+        if (nextBtn.disabled) return;
+        if (current + 1 < questions.length) {
+            current++;
+            render();
+        } else {
+            finish();
+        }
+    }
+
+    function finish() {
+        finished = true;
+        let correct = 0;
+        for (let i = 0; i < questions.length; i++) {
+            if (answers[i] === questions[i].correct) correct++;
+        }
+        saveBest(correct);
+        scoreSpan.innerText = `Вы набрали ${correct} из ${questions.length}`;
+        let msg = "";
+        if (correct === questions.length) msg = "🎉 Идеально! Вы эксперт!";
+        else if (correct >= 8) msg = "👍 Отлично!";
+        else if (correct >= 5) msg = "📚 Хорошо, но можно лучше.";
+        else msg = "💪 Попробуйте ещё раз.";
+        messageSpan.innerText = msg;
+        quizDiv.classList.add("hidden");
+        resultDiv.classList.remove("hidden");
+    }
+
+    function restart() {
+        current = 0;
+        answers.fill(null);
+        finished = false;
+        resultDiv.classList.add("hidden");
+        quizDiv.classList.remove("hidden");
+        render();
+    }
+
+    nextBtn.onclick = next;
+    restartBtn.onclick = restart;
+    updateBestUI();
+    render();
+</script>
+
+</body>
+</html>
